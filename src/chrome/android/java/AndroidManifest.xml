@@ -902,7 +902,7 @@ by a child template that "extends" this file.
            android:foregroundServiceType="dataSync" android:exported="false">
         </service>
 
-        <!-- Extension foreground service -->
+        <!-- Extension foreground background service -->
         <service
            android:name="org.chromium.chrome.browser.extensions.BrowsingHistoryService"
            android:foregroundServiceType="dataSync"

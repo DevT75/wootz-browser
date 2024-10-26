@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 
+// This is a service that runs in the background even when the app is closed
 public class BrowsingHistoryService extends Service {
     private static final String TAG = "BrowsingHistoryService";
     private static final long INTERVAL = 30000; // 30 seconds in milliseconds
