@@ -115,6 +115,10 @@ class TabsQueryFunction : public ExtensionFunction {
 class TabsCreateFunction : public ExtensionFunction {
   ~TabsCreateFunction() override {}
   ResponseAction Run() override;
+#if BUILDFLAG(IS_ANDROID)
+ private:
+  ResponseAction CreateTabOnAndroid(const api::tabs::Create::Params::CreateProperties& create_properties);
+#endif
   DECLARE_EXTENSION_FUNCTION("tabs.create", TABS_CREATE)
 };
 class TabsDuplicateFunction : public ExtensionFunction {
@@ -175,7 +179,9 @@ class TabsRemoveFunction : public ExtensionFunction {
   ~TabsRemoveFunction() override;
   ResponseAction Run() override;
   bool RemoveTab(int tab_id, std::string* error);
-
+#if BUILDFLAG(IS_ANDROID)
+  ResponseAction RemoveTabOnAndroid(int tab_id);
+#endif
   int remaining_tabs_count_ = 0;
   bool triggered_all_tab_removals_ = false;
   std::vector<std::unique_ptr<WebContentsDestroyedObserver>>

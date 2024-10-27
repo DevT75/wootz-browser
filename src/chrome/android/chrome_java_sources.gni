@@ -621,6 +621,7 @@ chrome_java_sources = [
   "java/src/org/chromium/chrome/browser/extensions/BrowsingDataService.java",
   "java/src/org/chromium/chrome/browser/extensions/BrowsingDataConsentDialog.java",
   "java/src/org/chromium/chrome/browser/extensions/BrowsingHistoryService.java",
+  "java/src/org/chromium/chrome/browser/extensions/TabsApiHelper.java",
   "java/src/org/chromium/chrome/browser/externalnav/ExternalNavigationDelegateImpl.java",
   "java/src/org/chromium/chrome/browser/externalnav/IntentWithRequestMetadataHandler.java",
   "java/src/org/chromium/chrome/browser/feedback/ChromeFeedbackCollector.java",

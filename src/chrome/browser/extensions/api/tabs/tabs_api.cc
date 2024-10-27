@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/logging.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
@@ -130,6 +131,13 @@
 #include "ui/display/screen.h"
 #include "ui/gfx/geometry/rect.h"
 
+#include "base/android/jni_android.h"
+#include "base/android/jni_string.h"
+#include "base/android/jni_array.h"
+#include "base/android/scoped_java_ref.h"
+#include "chrome/android/chrome_jni_headers/TabsApiHelper_jni.h"
+#include "base/json/json_writer.h"
+
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/chromeos/window_pin_util.h"
@@ -149,6 +157,7 @@ using content::Referrer;
 using content::WebContents;
 using tabs::TabModel;
 using zoom::ZoomController;
+using base::android::ScopedJavaLocalRef;
 
 namespace extensions {
 
@@ -1340,10 +1349,48 @@ ExtensionFunction::ResponseAction TabsQueryFunction::Run() {
   return RespondNow(Error(std::move("not implemented")));
 }
 
+// ExtensionFunction::ResponseAction TabsCreateFunction::Run() {
+//   std::optional<tabs::Create::Params> params =
+//       tabs::Create::Params::Create(args());
+//   EXTENSION_FUNCTION_VALIDATE(params);
+//   return RespondNow([&] {
+//     if (!ExtensionTabUtil::IsTabStripEditable()) {
+//       return Error(tabs_constants::kTabStripNotEditableError);
+//     }
+
+//     ExtensionTabUtil::OpenTabParams options;
+//     options.window_id = params->create_properties.window_id;
+//     options.opener_tab_id = params->create_properties.opener_tab_id;
+//     options.active = params->create_properties.selected;
+//     // The 'active' property has replaced the 'selected' property.
+//     options.active = params->create_properties.active
+//     options.pinned = params->create_properties.pinned;
+//     options.index = params->create_properties.index;
+//     options.url = params->create_properties.url;
+
+//     auto result = ExtensionTabUtil::OpenTab(this, options, user_gesture());
+//     if (!result.has_value()) {
+//       return Error(result.error());
+//     }
+
+//     NotifyExtensionTelemetry(Profile::FromBrowserContext(browser_context()),
+//                              extension(), safe_browsing::TabsApiInfo::CREATE,
+//                              /*current_url=*/std::string(),
+//                              options.url.value_or(std::string()));
+
+//     // Return data about the newly created tab.
+//     return has_callback() ? WithArguments(std::move(*result)) : NoArguments();
+//   }());
+// }
+
 ExtensionFunction::ResponseAction TabsCreateFunction::Run() {
   std::optional<tabs::Create::Params> params =
       tabs::Create::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
+
+#if BUILDFLAG(IS_ANDROID)
+  return CreateTabOnAndroid(params->create_properties);
+#else
   return RespondNow([&] {
     if (!ExtensionTabUtil::IsTabStripEditable()) {
       return Error(tabs_constants::kTabStripNotEditableError);
@@ -1372,6 +1419,7 @@ ExtensionFunction::ResponseAction TabsCreateFunction::Run() {
     // Return data about the newly created tab.
     return has_callback() ? WithArguments(std::move(*result)) : NoArguments();
   }());
+#endif
 }
 
 ExtensionFunction::ResponseAction TabsDuplicateFunction::Run() {
@@ -1955,11 +2003,46 @@ ExtensionFunction::ResponseAction TabsReloadFunction::Run() {
 TabsRemoveFunction::TabsRemoveFunction() = default;
 TabsRemoveFunction::~TabsRemoveFunction() = default;
 
+// ExtensionFunction::ResponseAction TabsRemoveFunction::Run() {
+//   std::optional<tabs::Remove::Params> params =
+//       tabs::Remove::Params::Create(args());
+//   EXTENSION_FUNCTION_VALIDATE(params);
+
+//   std::string error;
+//   if (params->tab_ids.as_integers) {
+//     std::vector<int>& tab_ids = *params->tab_ids.as_integers;
+//     for (int tab_id : tab_ids) {
+//       if (!RemoveTab(tab_id, &error))
+//         return RespondNow(Error(std::move(error)));
+//     }
+//   } else {
+//     EXTENSION_FUNCTION_VALIDATE(params->tab_ids.as_integer);
+//     if (!RemoveTab(*params->tab_ids.as_integer, &error))
+//       return RespondNow(Error(std::move(error)));
+//   }
+//   triggered_all_tab_removals_ = true;
+//   DCHECK(!did_respond());
+//   // WebContentsDestroyed will return the response in most cases, except when
+//   // the last tab closed immediately (it won't return a response because
+//   // |triggered_all_tab_removals_| will still be false). In this case we should
+//   // return the response from here.
+//   if (remaining_tabs_count_ == 0) {
+//     return RespondNow(NoArguments());
+//   }
+//   return RespondLater();
+// }
+
 ExtensionFunction::ResponseAction TabsRemoveFunction::Run() {
   std::optional<tabs::Remove::Params> params =
       tabs::Remove::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
 
+#if BUILDFLAG(IS_ANDROID)
+  if (!params->tab_ids.as_integer) {
+    return RespondNow(Error("Invalid tab_id parameter"));
+  }
+  return RemoveTabOnAndroid(*params->tab_ids.as_integer);
+#else
   std::string error;
   if (params->tab_ids.as_integers) {
     std::vector<int>& tab_ids = *params->tab_ids.as_integers;
@@ -1974,14 +2057,11 @@ ExtensionFunction::ResponseAction TabsRemoveFunction::Run() {
   }
   triggered_all_tab_removals_ = true;
   DCHECK(!did_respond());
-  // WebContentsDestroyed will return the response in most cases, except when
-  // the last tab closed immediately (it won't return a response because
-  // |triggered_all_tab_removals_| will still be false). In this case we should
-  // return the response from here.
   if (remaining_tabs_count_ == 0) {
     return RespondNow(NoArguments());
   }
   return RespondLater();
+#endif
 }
 
 bool TabsRemoveFunction::RemoveTab(int tab_id, std::string* error) {
@@ -2904,4 +2984,88 @@ ExtensionFunction::ResponseAction TabsGoBackFunction::Run() {
   return RespondNow(NoArguments());
 }
 
+#if BUILDFLAG(IS_ANDROID)
+api::tabs::Tab ConvertJavaTabToAPITab(JNIEnv* env, jobject j_tab) {
+    api::tabs::Tab tab;
+
+    // Get the Tab class
+    jclass tabClass = env->GetObjectClass(j_tab);
+
+    // Get tab ID
+    jmethodID getIdMethod = env->GetMethodID(tabClass, "getId", "()I");
+    tab.id = env->CallIntMethod(j_tab, getIdMethod);
+
+    // Get tab URL
+    jmethodID getUrlMethod = env->GetMethodID(tabClass, "getUrl", "()Ljava/lang/String;");
+    jstring urlString = static_cast<jstring>(env->CallObjectMethod(j_tab, getUrlMethod));
+    if (urlString) {
+        const char* urlChars = env->GetStringUTFChars(urlString, nullptr);
+        tab.url = urlChars;
+        env->ReleaseStringUTFChars(urlString, urlChars);
+    }
+
+    // Get tab title
+    jmethodID getTitleMethod = env->GetMethodID(tabClass, "getTitle", "()Ljava/lang/String;");
+    jstring titleString = static_cast<jstring>(env->CallObjectMethod(j_tab, getTitleMethod));
+    if (titleString) {
+        const char* titleChars = env->GetStringUTFChars(titleString, nullptr);
+        tab.title = titleChars;
+        env->ReleaseStringUTFChars(titleString, titleChars);
+    }
+
+    // Get tab active state
+    jmethodID isActiveMethod = env->GetMethodID(tabClass, "isActive", "()Z");
+    tab.active = env->CallBooleanMethod(j_tab, isActiveMethod);
+
+    // Get tab incognito state
+    jmethodID isIncognitoMethod = env->GetMethodID(tabClass, "isIncognito", "()Z");
+    tab.incognito = env->CallBooleanMethod(j_tab, isIncognitoMethod);
+
+    // Add other properties as needed...
+
+    return tab;
+}
+
+
+ExtensionFunction::ResponseAction TabsCreateFunction::CreateTabOnAndroid(
+    const api::tabs::Create::Params::CreateProperties& create_properties) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  std::string url = create_properties.url.value_or("");
+  
+  ScopedJavaLocalRef<jstring> j_url = 
+      base::android::ConvertUTF8ToJavaString(env, url);
+
+  // Call Java method to create tab
+  ScopedJavaLocalRef<jobject> j_tab = Java_TabsApiHelper_createTab(env, j_url);
+
+  if (j_tab.is_null()) {
+    return RespondNow(Error("Failed to create tab"));
+  }
+
+  // Convert Java Tab object to C++ api::tabs::Tab
+  api::tabs::Tab tab = ConvertJavaTabToAPITab(env, j_tab.obj());
+
+  return RespondNow(ArgumentList(tabs::Create::Results::Create(tab)));
+}
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+ExtensionFunction::ResponseAction TabsRemoveFunction::RemoveTabOnAndroid(
+    int tab_id) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  
+  jboolean success = Java_TabsApiHelper_removeTab(env, tab_id);
+
+  base::Value::Dict result;
+  result.Set("success", static_cast<bool>(success));
+
+  std::string json_string;
+  base::JSONWriter::Write(result, &json_string);
+
+  return RespondNow(WithArguments(json_string));
+}
+#endif
+
 }  // namespace extensions
+
+

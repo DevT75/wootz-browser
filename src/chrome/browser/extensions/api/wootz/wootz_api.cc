@@ -77,7 +77,6 @@ ExtensionFunction::ResponseAction WootzHelloWorldFunction::Run() {
   return RespondNow(WithArguments(json_string));
 }
 
-// api definition for showing the dialog and getting the consent
 ExtensionFunction::ResponseAction WootzShowDialogFunction::Run() {
     JNIEnv* env = base::android::AttachCurrentThread();
     

@@ -267,6 +267,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.DoubleConsumer;
+import org.chromium.base.ApplicationStatus;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -4097,6 +4098,16 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                         }
                     });
         }
+    }
+
+
+    public static ChromeTabbedActivity getActivity() {
+        for (Activity activity : ApplicationStatus.getRunningActivities()) {
+            if (activity instanceof ChromeTabbedActivity) {
+                return (ChromeTabbedActivity) activity;
+            }
+        }
+        return null;
     }
 
     // private void showBottomMenu(){

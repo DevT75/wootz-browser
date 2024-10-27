@@ -40,7 +40,7 @@ public class WootzBridge {
             .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    // For Starting the background service
+                    // Start the background service
                     Intent serviceIntent = new Intent(context, BrowsingHistoryService.class);
                     context.startService(serviceIntent);
                     

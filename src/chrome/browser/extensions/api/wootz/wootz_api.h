@@ -59,7 +59,7 @@ class WootzHelloWorldFunction : public ExtensionFunction {
 
   ResponseAction Run() override;
 };
-// api declaration for showing the dialog and getting the consent
+
 class WootzShowDialogFunction : public ExtensionFunction {
     DECLARE_EXTENSION_FUNCTION("wootz.showDialog", WOOTZ_SHOWDIALOG)
     WootzShowDialogFunction() = default;
